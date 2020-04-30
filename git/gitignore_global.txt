@@ -1,0 +1,13 @@
+*.pyc
+.DS_Store
+.clang-format
+.clang_complete
+.vscode
+.ropeproject
+.clangd
+Session.vim
+__pycache__
+build
+compile_commands.json
+cscope.out
+tags

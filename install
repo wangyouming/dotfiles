@@ -1,0 +1,387 @@
+#!/usr/bin/env bash
+
+platform=$(uname)
+
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+# update submodules
+git -C "${script_dir}" submodule init
+git -C "${script_dir}" submodule update --recursive
+
+# install package
+# param $1: packname
+function install()
+{
+  local pack=$1
+
+  local pack_path=$(command -v ${pack})
+  if [[ -n ${pack_path} ]]; then
+    echo ${pack} is already installed at ${pack_path}.
+  else
+    echo installing ${pack}...
+
+    if [[ ${platform} == *Darwin* ]]; then
+      brew install ${pack}
+    else
+      sudo apt install ${pack}
+    fi
+  fi
+}
+
+# symlink
+# param $1: source_path
+# param $2: dest_path
+function symlink()
+{
+  local source_path=$1
+  local dest_path=$2
+
+  if [[ -e ${dest_path} ]]; then
+    if [[ -h ${dest_path} ]]; then
+      echo "remove origin symlink ${dest_path}."
+      rm $dest_path
+    else
+      renamed_path="${dest_path}_bk"
+      echo "rename ${dest_path} to ${renamed_path}."
+      rm ${dest_path}
+    fi
+  fi
+
+  echo "symlink ${dest_path} to ${source_path}."
+  ln -s -f ${source_path} ${dest_path}
+}
+
+if [ ! -d ~/dotfiles ]; then
+  symlink ${script_dir} ~/dotfiles
+fi
+
+# install brew
+if [[ ${platform} == *Darwin* ]]; then
+  brew_path=$(command -v brew)
+  if [[ -z ${brew_path} ]]; then
+    echo installing brew...
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+  else
+    echo brew is already installed at ${brew_path}.
+  fi
+fi
+
+install ack
+install cmake
+install cscope
+install cppcheck
+install python3
+install tidy
+install tldr
+install tmate
+install tree
+install tmux
+install zsh
+
+# install rg
+rg_path=$(command -v rg)
+if [[ -n "${rg_path}" ]]; then
+  echo rg is already installed at ${rg_path}.
+else
+  echo installing rg...
+
+  if [[ ${platform} == *Darwin* ]]; then
+    brew install ripgrep
+  else
+    temp_dir=$(mktemp -d)
+    pushd ${temp_dir}
+    wget https://github.com/BurntSushi/ripgrep/releases/download/11.0.2/ripgrep_11.0.2_amd64.deb -O ripgrep.deb
+    sudo dpkg -i ripgrep.deb
+    popd
+  fi
+fi
+
+# install autopep8
+autopep8_path=$(command -v autopep8)
+if [[ -n "${autopep8_path}" ]]; then
+  echo autopep8 is already installed at ${autopep8_path}.
+else
+  echo installing autopep8...
+
+  if [[ ${platform} == *Darwin* ]]; then
+    brew install autopep8
+  else
+    sudo apt install python-autopep8
+  fi
+fi
+
+# install ctags
+if [[ -x /usr/local/bin/ctags ]]; then
+  echo Universal Ctags is already installed at /usr/local/bin/ctags.
+else
+  echo installing Universal Ctags...
+
+  if [[ ${platform} == *Darwin* ]]; then
+    brew tap universal-ctags/universal-ctags
+    brew install --HEAD universal-ctags
+  else
+    # install GNU/Linux distributions
+    # needed by installing universal-ctags
+    sudo apt install \
+      gcc make \
+      pkg-config autoconf automake \
+      python3-docutils \
+      libseccomp-dev \
+      libjansson-dev \
+      libyaml-dev \
+      libxml12-dev
+
+    pushd "${script_dir}/tools/ctags"
+    ./autogen.sh
+    ./configure --prefix=/usr/local
+    sudo make
+    sudo make install
+    popd
+  fi
+fi
+
+# install fzf
+fzf_path=$(command -v fzf)
+if [[ -n "${fzf_path}" ]]; then
+  echo fzf is already installed at ${fzf_path}.
+else
+  echo installing fzf...
+
+  if [[ ${platform} == *Darwin* ]]; then
+    brew install fzf
+
+        # To install useful key bindings and fuzzy completion
+        $(brew --prefix)/opt/fzf/install
+      else
+        git clone --depth=1 https://github.com/junegunn/fzf.git ~/.fzf
+        ~/.fzf/install
+  fi
+fi
+
+# install ipython
+if [[ ${platform} == *Darwin* ]]; then
+  install ipython
+else
+  install ipython3
+fi
+
+# install js-beautify
+js_beautify_path=$(command -v js-beautify)
+if [[ -n "${js_beautify_path}" ]]; then
+  echo js-beautify is already installed at ${js_beautify_path}.
+else
+  echo installing js-beautify...
+
+  sudo npm install -g js-beautify
+fi
+
+# install llvm
+if command -v clang >/dev/null; then
+  echo llvm is already installed.
+else
+  echo installing llvm...
+  if [[ ${platform} == *Darwin* ]]; then
+    brew install llvm
+  else
+    sudo apt install llvm
+  fi
+fi
+
+# install nodejs
+node_path=$(command -v node)
+if [[ -n "${node_path}" ]]; then
+  echo nodejs is already installed at ${node_path}.
+else
+  echo installing nodejs...
+
+  if [[ ${platform} == *Darwin* ]]; then
+    brew install node
+  else
+    sudo apt install nodejs
+    sudo apt install npm
+  fi
+fi
+
+# install pip
+pip_path=$(command -v pip)
+if [[ -n "${pip_path}" ]]; then
+  echo pip is already installed at ${pip_path}.
+else
+  echo 'installing pip...'
+
+  temp_dir=$(mktemp -d)
+  get_pip_path="${temp_dir}/get-pip.py"
+  curl https://bootstrap.pypa.io/get-pip.py -o "${get_pip_path}"
+  python "${get_pip_path}"
+fi
+
+# install pylint
+pylint_path=$(command -v pylint)
+if [[ -n "${pylint_path}" ]]; then
+  echo pylint is already installed at ${pylint_path}.
+else
+  echo 'installing pylint...'
+
+  python3 -m pip install pylint
+fi
+
+# install ipdb
+python3 -m pip show ipdb &>/dev/null
+if [[ $? == 0 ]]; then
+  echo 'ipdb (python package) is already installed.'
+else
+  echo installing ipdb...
+
+  python3 -m pip install ipdb
+fi
+
+# install ranger
+ranger_path=$(command -v ranger)
+if [[ -n "${ranger_path}" ]]; then
+  echo ranger is already installed at ${ranger_path}.
+else
+  install ranger
+  ranger --copy-config=all
+fi
+
+# install svn
+svn_path=$(command -v svn)
+if [[ -n "${svn_path}" ]]; then
+  echo svn is already installed at ${svn_path}.
+else
+  echo installing svn...
+
+  if [[ "${platform}" == *Darwin* ]]; then
+    brew install subversion
+  else
+    sudo apt install subversion
+  fi
+fi
+
+# install vim
+vim_path=$(command -v vim)
+if [[ -n "${vim_path}" ]]; then
+  echo vim is already installed at ${vim_path}.
+else
+  echo installing vim...
+  if [[ ${platform} == *Darwin* ]]; then
+    brew cask install macvim
+  else
+    install vim-nox
+  fi
+fi
+
+# install vimgolf
+vimgolf_path=$(command -v vimgolf)
+if [[ -n "${vimgolf_path}" ]]; then
+  echo vimgolf is already installed.
+else
+  echo installing vimgolf...
+  sudo gem install vimgolf
+fi
+
+# install oh-my-zsh
+if [[ -d ~/.oh-my-zsh ]]; then
+  echo oh-my-zsh is already installed at ~/.oh-my-zsh.
+else
+  echo installing oh-my-zsh...
+  sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+fi
+
+# install virtualenv
+virtualenv_path=$(command -v virtualenv)
+if [[ -n "${virtualenv_path}" ]]; then
+  echo virtualenv is already installed at ${virtualenv_path}.
+else
+  echo installing virtualenv...
+
+  python3 -m pip install virtualenv
+fi
+
+# install virtualenvwrapper
+virtualenvwrapper_path=$(command -v virtualenvwrapper.sh)
+if [[ -n "${virtualenvwrapper_path}" ]]; then
+  echo virtualenvwrapper is already installed at ${virtualenvwrapper_path}.
+else
+  echo installing virtualenvwrapper...
+  python3 -m pip install virtualenvwrapper
+fi
+mkdir -p "$HOME/.virtualenvs"
+
+# install when-changed
+when_changed_path=$(command -v when-changed)
+if [[ -n "${when_changed_path}" ]]; then
+  echo when-changed is already installed at ${when_changed_path}.
+else
+  echo installing when-changed...
+  python3 -m pip install when-changed
+fi
+
+# symlink .clang-format
+symlink "${script_dir}/clang-format/clang-format.txt" ~/.clang-format
+
+# symlink .gitignore_global
+symlink "${script_dir}/git/gitignore_global.txt" ~/.gitignore_global
+
+# symlink
+symlink "${script_dir}/vim/UltiSnips" $HOME/.vim/UltiSnips
+
+# symlink .vimrc
+symlink "${script_dir}/vim/vimrc.vim" ~/.vimrc
+
+# generate a systag file for Vim code completion
+python vim/gen_systags/gen_systags.py &>/dev/null
+
+# symlink filetye.vim
+symlink "${script_dir}/vim/filetype.vim" ~/.vim/filetype.vim
+
+# symlink vim plugin
+symlink "${script_dir}/vim/plugin" ~/.vim/plugin
+
+# symlink oh-my-tmux
+symlink "${script_dir}/tools/oh-my-tmux/.tmux.conf" ~/.tmux.conf
+symlink "${script_dir}/tmux/tmux.conf.local" ~/.tmux.conf.local
+
+# setup git global config
+source "${script_dir}/git/setup.sh"
+
+sed -i.bak 's/^plugins=.*$/plugins=(flutter git osx ruby tmux vi-mode z zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc
+
+grep -q "source ${script_dir}/zsh/source.sh" ~/.zshrc || \
+  echo "source ${script_dir}/zsh/source.sh" >> ~/.zshrc
+
+# install bat
+bat_path=$(command -v bat)
+if [[ -n "${bat_path}" ]]; then
+  echo bat is already installed at ${bat_path}.
+else
+  echo installing bat...
+
+  if [[ ${platform} == *Darwin* ]]; then
+    brew install bat
+  else
+    temp_dir=$(mktemp -d)
+    pushd ${temp_dir}
+    wget https://github.com/sharkdp/bat/releases/download/v0.15.4/bat-musl_0.15.4_amd64.deb -O bat.deb
+    sudo dpkg -i bat.deb
+    popd
+  fi
+fi
+
+# install zsh-autosuggestions
+ZSH_AUTOSUGGESTIONS_DIR="$HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions"
+if [[ -d "${ZSH_AUTOSUGGESTIONS_DIR}" ]]; then
+  echo zsh-autosuggestions is already installed at ${ZSH_AUTOSUGGESTIONS_DIR}.
+else
+  echo installing zsh-autosuggestions...
+  git clone https://github.com/zsh-users/zsh-autosuggestions "${ZSH_AUTOSUGGESTIONS_DIR}"
+fi
+
+# install zsh-syntax-highlighting
+ZSH_SYNTAX_HIGHLIGHTING_DIR="$HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting"
+if [[ -d "${ZSH_SYNTAX_HIGHLIGHTING_DIR}" ]]; then
+  echo zsh-syntax-highlighting is already installed at ${ZSH_SYNTAX_HIGHLIGHTING_DIR}.
+else
+  echo installing zsh-syntax-highlighting...
+  git clone https://github.com/zsh-users/zsh-syntax-highlighting "${ZSH_SYNTAX_HIGHLIGHTING_DIR}"
+fi
